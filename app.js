@@ -477,7 +477,7 @@ function addStars() {
     });
     
     // Add a few shooting stars
-    const starsContainer = document.querySelector('.stars');
+    // const starsContainer = document.querySelector('.stars');
     
     for (let i = 0; i < 3; i++) {
         const shootingStar = document.createElement('div');
