@@ -216,24 +216,24 @@ function applyWeatherTheme(condition, sunrise, sunset, currentTime) {
     const existingEffects = document.querySelectorAll('.rain-drops, .snow-flakes, .lightning');
     existingEffects.forEach(effect => effect.remove());
     
-    // Determine time of day with more granularity
-    const timeOfDay = getTimeOfDay(sunrise, sunset, currentTime);
+    // Determine if it's day or night for clear conditions
+    const isNight = isNightTime(sunrise, sunset, currentTime);
     
-    // Set theme based on weather condition and time of day
+    // Set theme based on weather condition
     switch (condition) {
         case 'clear-day':
-            themeClass = getTimeBasedTheme(timeOfDay);
+            themeClass = 'theme-clear-day';
             break;
         case 'clear-night':
-            themeClass = getTimeBasedTheme(timeOfDay);
+            themeClass = 'theme-clear-night';
             addStars();
             break;
         case 'partly-cloudy-day':
-            themeClass = getTimeBasedTheme(timeOfDay);
+            themeClass = 'theme-clear-day';
             addClouds(3);
             break;
         case 'partly-cloudy-night':
-            themeClass = getTimeBasedTheme(timeOfDay);
+            themeClass = 'theme-clear-night';
             addClouds(3);
             addStars();
             break;
@@ -262,72 +262,21 @@ function applyWeatherTheme(condition, sunrise, sunset, currentTime) {
             addSnow();
             break;
         default:
-            // Default to time-based theme
-            themeClass = getTimeBasedTheme(timeOfDay);
-            if (timeOfDay === 'night' || timeOfDay === 'late-night') addStars();
+            // Default to clear day/night based on time
+            themeClass = isNight ? 'theme-clear-night' : 'theme-clear-day';
+            if (isNight) addStars();
     }
     
     body.classList.add(themeClass);
 }
 
-function getTimeOfDay(sunrise, sunset, currentTime) {
+function isNightTime(sunrise, sunset, currentTime) {
     // Convert times to comparable format
-    const now = new Date(currentTime);
-    const sunriseTime = new Date(sunrise);
-    const sunsetTime = new Date(sunset);
+    const now = new Date(currentTime).getTime();
+    const sunriseTime = new Date(sunrise).getTime();
+    const sunsetTime = new Date(sunset).getTime();
     
-    // Calculate sunrise and sunset +/- 1 hour for transition periods
-    const sunriseStart = new Date(sunriseTime);
-    sunriseStart.setHours(sunriseTime.getHours() - 1);
-    
-    const sunriseEnd = new Date(sunriseTime);
-    sunriseEnd.setHours(sunriseTime.getHours() + 1);
-    
-    const sunsetStart = new Date(sunsetTime);
-    sunsetStart.setHours(sunsetTime.getHours() - 1);
-    
-    const sunsetEnd = new Date(sunsetTime);
-    sunsetEnd.setHours(sunsetTime.getHours() + 1);
-    
-    // Get midnight points
-    const midnight = new Date(now);
-    midnight.setHours(0, 0, 0, 0);
-    
-    const midnightEnd = new Date(midnight);
-    midnightEnd.setHours(4, 0, 0, 0);
-    
-    const midnightStart = new Date(midnight);
-    midnightStart.setHours(22, 0, 0, 0);
-    
-    // Determine time of day
-    if (now >= sunriseStart && now <= sunriseEnd) {
-        return 'sunrise';
-    } else if (now >= sunsetStart && now <= sunsetEnd) {
-        return 'sunset';
-    } else if ((now >= midnightStart || now <= midnightEnd)) {
-        return 'late-night';
-    } else if (now > sunriseEnd && now < sunsetStart) {
-        return 'day';
-    } else {
-        return 'night';
-    }
-}
-
-function getTimeBasedTheme(timeOfDay) {
-    switch (timeOfDay) {
-        case 'sunrise':
-            return 'theme-sunrise';
-        case 'sunset':
-            return 'theme-sunset';
-        case 'day':
-            return 'theme-clear-day';
-        case 'night':
-            return 'theme-clear-night';
-        case 'late-night':
-            return 'theme-midnight';
-        default:
-            return 'theme-clear-day';
-    }
+    return now < sunriseTime || now > sunsetTime;
 }
 
 function addRain() {
@@ -374,200 +323,49 @@ function addSnow() {
         
         // Random positioning
         const left = Math.random() * containerWidth;
-        flake.style.left = `${left}px`;
-        
-        // Random animation duration and delay
-        const animationDuration = 5 + Math.random() * 7; // Between 5 and 12s
+        const animationDuration = 3 + Math.random() * 5; // Between 3 and 8s
         const animationDelay = Math.random() * 5; // Between 0 and 5s
         
-        flake.style.animation = `snowFall ${animationDuration}s linear infinite ${animationDelay}s`;
+        flake.style.left = `${left}px`;
         flake.style.opacity = 0.7 + Math.random() * 0.3;
+        flake.style.animation = `snowFall ${animationDuration}s linear infinite ${animationDelay}s`;
         
         snowContainer.appendChild(flake);
     }
 }
 
-function addClouds(count) {
-    // This function will add cloud elements to the scene
-    // First create a container for clouds
-    const cloudContainer = document.createElement('div');
-    cloudContainer.className = 'clouds';
-    cloudContainer.style.position = 'absolute';
-    cloudContainer.style.top = '0';
-    cloudContainer.style.left = '0';
-    cloudContainer.style.width = '100%';
-    cloudContainer.style.height = '100%';
-    cloudContainer.style.zIndex = '1';
-    cloudContainer.style.pointerEvents = 'none';
-    document.querySelector('.app-container').appendChild(cloudContainer);
-    
-    // Create cloud SVGs
-    for (let i = 0; i < count; i++) {
-        const cloud = document.createElement('div');
-        cloud.className = 'cloud';
-        cloud.style.position = 'absolute';
-        
-        // Different cloud sizes
-        const scale = 0.5 + Math.random() * 0.8;
-        
-        // Different positions
-        const top = Math.random() * 40; // Top 40% of the container
-        const left = Math.random() * 100;
-        
-        cloud.style.top = `${top}%`;
-        cloud.style.left = `${left}%`;
-        cloud.style.transform = `scale(${scale})`;
-        cloud.style.opacity = 0.7 + Math.random() * 0.3;
-        
-        // Create cloud shape using CSS
-        cloud.style.width = '100px';
-        cloud.style.height = '60px';
-        cloud.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-        cloud.style.borderRadius = '50px';
-        cloud.style.boxShadow = '0 8px 5px rgba(0, 0, 0, 0.1)';
-        cloud.style.position = 'relative';
-        
-        // Add cloud elements (circles) to create fluffy appearance
-        const positions = [
-            { top: '-20px', left: '10px', width: '60px', height: '60px' },
-            { top: '-30px', left: '45px', width: '70px', height: '70px' },
-            { top: '-20px', left: '75px', width: '60px', height: '60px' }
-        ];
-        
-        positions.forEach(pos => {
-            const circle = document.createElement('div');
-            circle.style.position = 'absolute';
-            circle.style.top = pos.top;
-            circle.style.left = pos.left;
-            circle.style.width = pos.width;
-            circle.style.height = pos.height;
-            circle.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-            circle.style.borderRadius = '50%';
-            cloud.appendChild(circle);
-        });
-        
-        // Add slow animation
-        const duration = 60 + Math.random() * 60; // Between 60 and 120s
-        const delay = Math.random() * 30; // Between 0 and 30s
-        
-        cloud.style.animation = `cloudFloat ${duration}s linear infinite ${delay}s`;
-        
-        cloudContainer.appendChild(cloud);
-    }
-    
-    // Add keyframes for cloud animation
-    if (!document.getElementById('cloud-keyframes')) {
-        const style = document.createElement('style');
-        style.id = 'cloud-keyframes';
-        style.textContent = `
-            @keyframes cloudFloat {
-                0% { transform: translateX(-150px) scale(${scale}); }
-                100% { transform: translateX(calc(100vw + 150px)) scale(${scale}); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
-function addStars() {
-    // Since we already have stars created, we'll just make them more visible
-    const stars = document.querySelectorAll('.star');
-    stars.forEach(star => {
-        star.style.setProperty('--brightness', '1'); // Make stars fully bright
-    });
-    
-    // Add a few shooting stars
-    // const starsContainer = document.querySelector('.stars');
-    
-    for (let i = 0; i < 3; i++) {
-        const shootingStar = document.createElement('div');
-        shootingStar.className = 'shooting-star';
-        
-        shootingStar.style.position = 'absolute';
-        shootingStar.style.width = '2px';
-        shootingStar.style.height = '80px';
-        shootingStar.style.backgroundColor = 'white';
-        shootingStar.style.borderRadius = '50%';
-        shootingStar.style.boxShadow = '0 0 10px 5px rgba(255, 255, 255, 0.3)';
-        
-        // Random position
-        const top = Math.random() * 30; // Top 30% of screen
-        const left = Math.random() * 100;
-        shootingStar.style.top = `${top}%`;
-        shootingStar.style.left = `${left}%`;
-        
-        // Random angle
-        const angle = 30 + Math.random() * 30; // Between 30 and 60 degrees
-        shootingStar.style.transform = `rotate(${angle}deg)`;
-        
-        // Animation
-        const delay = 3 + Math.random() * 10; // Between 3 and 13s
-        const duration = 0.6 + Math.random() * 0.4; // Between 0.6 and 1s
-        
-        shootingStar.style.animation = `shootingStar ${duration}s ease-in ${delay}s infinite`;
-        
-        starsContainer.appendChild(shootingStar);
-    }
-    
-    // Add keyframes for shooting star animation
-    if (!document.getElementById('shooting-star-keyframes')) {
-        const style = document.createElement('style');
-        style.id = 'shooting-star-keyframes';
-        style.textContent = `
-            @keyframes shootingStar {
-                0% {
-                    opacity: 0;
-                    transform: rotate(var(--angle)) translateX(0);
-                }
-                10% {
-                    opacity: 1;
-                }
-                100% {
-                    opacity: 0;
-                    transform: rotate(var(--angle)) translateX(200px);
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
 function addLightning() {
-    const container = document.createElement('div');
-    container.className = 'lightning';
-    document.querySelector('.app-container').appendChild(container);
+    const lightningContainer = document.createElement('div');
+    lightningContainer.className = 'lightning';
+    document.querySelector('.app-container').appendChild(lightningContainer);
     
     const flash = document.createElement('div');
     flash.className = 'lightning-flash';
-    container.appendChild(flash);
+    lightningContainer.appendChild(flash);
     
-    // Set up lightning flash frequency
-    function triggerLightning() {
-        // Random opacity for the flash
-        const intensity = 0.7 + Math.random() * 0.3;
-        flash.style.opacity = intensity;
-        
-        // Flash duration
-        setTimeout(() => {
-            flash.style.opacity = 0;
-        }, 100 + Math.random() * 100); // Flash lasts between 100-200ms
-        
-        // Sometimes do a double flash
-        if (Math.random() > 0.6) {
-            setTimeout(() => {
-                flash.style.opacity = intensity * 0.8;
-                setTimeout(() => {
-                    flash.style.opacity = 0;
-                }, 50 + Math.random() * 50);
-            }, 150 + Math.random() * 100);
+    // Create lightning flashes at random intervals
+    setInterval(() => {
+        if (Math.random() > 0.8) { // 20% chance of lightning
+            flash.style.opacity = 0.8;
+            setTimeout(() => { flash.style.opacity = 0; }, 100);
+            setTimeout(() => { 
+                if (Math.random() > 0.5) { // 50% chance of secondary flash
+                    flash.style.opacity = 0.6;
+                    setTimeout(() => { flash.style.opacity = 0; }, 80);
+                }
+            }, 200);
         }
-        
-        // Schedule next lightning
-        const nextLightning = 3000 + Math.random() * 10000; // Between 3-13 seconds
-        setTimeout(triggerLightning, nextLightning);
-    }
-    
-    // Initial delay before first lightning
-    const initialDelay = 1000 + Math.random() * 3000;
-    setTimeout(triggerLightning, initialDelay);
+    }, 3000);
+}
+
+function addClouds(count) {
+    // This would be a more advanced feature requiring SVG or complex CSS
+    // For simplicity, it's not fully implemented in this version
+    console.log(`Would add ${count} clouds in a more complete implementation`);
+}
+
+function addStars() {
+    // Stars are already added in the background, but this function is kept
+    // for compatibility with the existing code
+    console.log("Stars already added in the background");
 }
