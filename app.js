@@ -1,9 +1,124 @@
 document.addEventListener('DOMContentLoaded', () => {
-    fetchWeatherData();
+    // Create stars in the background
+    createStars();
+
+    // Setup event listeners
+    setupLocationPrompt();
 });
 
-function fetchWeatherData() {
-    const apiUrl = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/Applegate?unitGroup=us&key=85DUYUNBCSCAENRTSQNQXVZPY&contentType=json';
+function createStars() {
+    const starsContainer = document.querySelector('.stars');
+    const numberOfStars = 200;
+    
+    for (let i = 0; i < numberOfStars; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        
+        // Random star size (0.5px to 2.5px)
+        const size = 0.5 + Math.random() * 2;
+        star.style.width = `${size}px`;
+        star.style.height = `${size}px`;
+        
+        // Random position
+        const posX = Math.random() * 100;
+        const posY = Math.random() * 100;
+        star.style.left = `${posX}%`;
+        star.style.top = `${posY}%`;
+        
+        // Random animation duration and delay
+        const duration = 2 + Math.random() * 4;
+        const delay = Math.random() * 5;
+        star.style.setProperty('--duration', `${duration}s`);
+        star.style.setProperty('--delay', `${delay}s`);
+        
+        // Random brightness
+        const brightness = 0.5 + Math.random() * 0.5;
+        star.style.setProperty('--brightness', brightness);
+        
+        starsContainer.appendChild(star);
+    }
+}
+
+function setupLocationPrompt() {
+    const locationPrompt = document.querySelector('.location-prompt');
+    const locationInput = document.getElementById('location-input');
+    const searchButton = document.getElementById('search-button');
+    const geolocationButton = document.getElementById('geolocation-button');
+    const changeLocationButton = document.getElementById('change-location');
+    
+    // Check if there's a saved location in localStorage
+    const savedLocation = localStorage.getItem('weatherLocation');
+    if (savedLocation) {
+        fetchWeatherData(savedLocation);
+        locationPrompt.style.display = 'none';
+        changeLocationButton.style.display = 'block';
+    }
+    
+    // Search button click event
+    searchButton.addEventListener('click', () => {
+        const location = locationInput.value.trim();
+        if (location) {
+            fetchWeatherData(location);
+            locationPrompt.style.display = 'none';
+            changeLocationButton.style.display = 'block';
+            localStorage.setItem('weatherLocation', location);
+        }
+    });
+    
+    // Enter key in input field
+    locationInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchButton.click();
+        }
+    });
+    
+    // Geolocation button click event
+    geolocationButton.addEventListener('click', () => {
+        if (navigator.geolocation) {
+            document.querySelector('.loading').style.display = 'flex';
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    fetchWeatherDataByCoords(lat, lon);
+                    locationPrompt.style.display = 'none';
+                    changeLocationButton.style.display = 'block';
+                },
+                (error) => {
+                    console.error('Error getting location:', error);
+                    alert('Unable to get your location. Please enter it manually.');
+                    document.querySelector('.loading').style.display = 'none';
+                }
+            );
+        } else {
+            alert('Geolocation is not supported by your browser. Please enter your location manually.');
+        }
+    });
+    
+    // Change location button click event
+    changeLocationButton.addEventListener('click', () => {
+        locationPrompt.style.display = 'flex';
+        locationInput.value = '';
+        locationInput.focus();
+    });
+}
+
+function fetchWeatherDataByCoords(lat, lon) {
+    const apiKey = '85DUYUNBCSCAENRTSQNQXVZPY'; // Replace with your actual API key
+    const apiUrl = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}?unitGroup=us&key=${apiKey}&contentType=json`;
+    
+    fetchFromApi(apiUrl);
+}
+
+function fetchWeatherData(location) {
+    const apiKey = '85DUYUNBCSCAENRTSQNQXVZPY'; // Replace with your actual API key
+    const apiUrl = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(location)}?unitGroup=us&key=${apiKey}&contentType=json`;
+    
+    fetchFromApi(apiUrl);
+}
+
+function fetchFromApi(apiUrl) {
+    document.querySelector('.loading').style.display = 'flex';
     
     fetch(apiUrl)
         .then(response => {
@@ -250,7 +365,7 @@ function addClouds(count) {
 }
 
 function addStars() {
-    // This would add star-like elements to a night theme
-    // For simplicity, it's not fully implemented in this version
-    console.log("Would add stars in a more complete implementation");
+    // Stars are already added in the background, but this function is kept
+    // for compatibility with the existing code
+    console.log("Stars already added in the background");
 }
