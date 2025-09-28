@@ -1,196 +1,273 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Create stars in the background
-    createStars();
+// Global state to replace localStorage
+const appState = {
+    savedLocation: null,
+    currentEffects: new Set(),
+    intervals: new Set()
+};
 
-    // Setup event listeners
-    setupLocationPrompt();
+// Constants for better maintainability
+const CONFIG = {
+    API_KEY: '85DUYUNBCSCAENRTSQNQXVZPY',
+    BASE_URL: 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline',
+    STARS_COUNT: 150, // Reduced from 200 for better performance
+    RAIN_DROPS: 40,   // Reduced from 50
+    SNOW_FLAKES: 30,  // Reduced from 40
+    FORECAST_DAYS: 5
+};
+
+// Weather icon mapping for better maintainability
+const WEATHER_ICONS = {
+    'clear-day': 'sun',
+    'clear-night': 'moon',
+    'partly-cloudy-day': 'cloud-sun',
+    'partly-cloudy-night': 'cloud-moon',
+    'cloudy': 'cloud',
+    'rain': 'rain',
+    'thunder': 'storm',
+    'snow': 'snow'
+};
+
+// Main initialization
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
 });
 
+function initializeApp() {
+    createStars();
+    setupLocationPrompt();
+}
+
+// Optimized star creation with fragment for better performance
 function createStars() {
     const starsContainer = document.querySelector('.stars');
-    const numberOfStars = 200;
+    if (!starsContainer) return;
     
-    for (let i = 0; i < numberOfStars; i++) {
-        const star = document.createElement('div');
-        star.className = 'star';
-        
-        // Random star size (0.5px to 2.5px)
-        const size = 0.5 + Math.random() * 2;
-        star.style.width = `${size}px`;
-        star.style.height = `${size}px`;
-        
-        // Random position
-        const posX = Math.random() * 100;
-        const posY = Math.random() * 100;
-        star.style.left = `${posX}%`;
-        star.style.top = `${posY}%`;
-        
-        // Random animation duration and delay
-        const duration = 2 + Math.random() * 4;
-        const delay = Math.random() * 5;
-        star.style.setProperty('--duration', `${duration}s`);
-        star.style.setProperty('--delay', `${delay}s`);
-        
-        // Random brightness
-        const brightness = 0.5 + Math.random() * 0.5;
-        star.style.setProperty('--brightness', brightness);
-        
-        starsContainer.appendChild(star);
+    const fragment = document.createDocumentFragment();
+    
+    for (let i = 0; i < CONFIG.STARS_COUNT; i++) {
+        const star = createStar();
+        fragment.appendChild(star);
     }
+    
+    starsContainer.appendChild(fragment);
+}
+
+function createStar() {
+    const star = document.createElement('div');
+    star.className = 'star';
+    
+    // Optimized random values
+    const size = 0.5 + Math.random() * 2;
+    const posX = Math.random() * 100;
+    const posY = Math.random() * 100;
+    const duration = 2 + Math.random() * 4;
+    const delay = Math.random() * 5;
+    const brightness = 0.5 + Math.random() * 0.5;
+    
+    // Set styles in one go
+    Object.assign(star.style, {
+        width: `${size}px`,
+        height: `${size}px`,
+        left: `${posX}%`,
+        top: `${posY}%`
+    });
+    
+    star.style.setProperty('--duration', `${duration}s`);
+    star.style.setProperty('--delay', `${delay}s`);
+    star.style.setProperty('--brightness', brightness);
+    
+    return star;
 }
 
 function setupLocationPrompt() {
-    const locationPrompt = document.querySelector('.location-prompt');
-    const locationInput = document.getElementById('location-input');
-    const searchButton = document.getElementById('search-button');
-    const geolocationButton = document.getElementById('geolocation-button');
-    const changeLocationButton = document.getElementById('change-location');
+    const elements = {
+        locationPrompt: document.querySelector('.location-prompt'),
+        locationInput: document.getElementById('location-input'),
+        searchButton: document.getElementById('search-button'),
+        geolocationButton: document.getElementById('geolocation-button'),
+        changeLocationButton: document.getElementById('change-location')
+    };
     
-    // Check if there's a saved location in localStorage
-    const savedLocation = localStorage.getItem('weatherLocation');
-    if (savedLocation) {
-        fetchWeatherData(savedLocation);
-        locationPrompt.style.display = 'none';
-        changeLocationButton.style.display = 'block';
+    // Check if any required elements are missing
+    if (!Object.values(elements).every(el => el)) {
+        console.warn('Some UI elements not found');
+        return;
     }
     
-    // Search button click event
-    searchButton.addEventListener('click', () => {
+    // Check for saved location in memory
+    if (appState.savedLocation) {
+        fetchWeatherData(appState.savedLocation);
+        toggleLocationUI(elements, false);
+    }
+    
+    setupEventListeners(elements);
+}
+
+function setupEventListeners(elements) {
+    const { locationPrompt, locationInput, searchButton, geolocationButton, changeLocationButton } = elements;
+    
+    // Search functionality
+    const handleSearch = () => {
         const location = locationInput.value.trim();
         if (location) {
             fetchWeatherData(location);
-            locationPrompt.style.display = 'none';
-            changeLocationButton.style.display = 'block';
-            localStorage.setItem('weatherLocation', location);
+            toggleLocationUI(elements, false);
+            appState.savedLocation = location;
         }
-    });
+    };
     
-    // Enter key in input field
+    searchButton.addEventListener('click', handleSearch);
     locationInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            searchButton.click();
-        }
+        if (e.key === 'Enter') handleSearch();
     });
     
-    // Geolocation button click event
-    geolocationButton.addEventListener('click', () => {
-        if (navigator.geolocation) {
-            document.querySelector('.loading').style.display = 'flex';
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    fetchWeatherDataByCoords(lat, lon);
-                    locationPrompt.style.display = 'none';
-                    changeLocationButton.style.display = 'block';
-                },
-                (error) => {
-                    console.error('Error getting location:', error);
-                    alert('Unable to get your location. Please enter it manually.');
-                    document.querySelector('.loading').style.display = 'none';
-                }
-            );
-        } else {
-            alert('Geolocation is not supported by your browser. Please enter your location manually.');
-        }
-    });
+    // Geolocation
+    geolocationButton.addEventListener('click', handleGeolocation);
     
-    // Change location button click event
+    // Change location
     changeLocationButton.addEventListener('click', () => {
-        locationPrompt.style.display = 'flex';
+        toggleLocationUI(elements, true);
         locationInput.value = '';
         locationInput.focus();
     });
 }
 
-function fetchWeatherDataByCoords(lat, lon) {
-    const apiKey = '85DUYUNBCSCAENRTSQNQXVZPY'; // Replace with your actual API key
-    const apiUrl = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}?unitGroup=us&key=${apiKey}&contentType=json`;
+function toggleLocationUI(elements, show) {
+    const { locationPrompt, changeLocationButton } = elements;
+    locationPrompt.style.display = show ? 'flex' : 'none';
+    changeLocationButton.style.display = show ? 'none' : 'block';
+}
+
+function handleGeolocation() {
+    if (!navigator.geolocation) {
+        showAlert('Geolocation is not supported by your browser. Please enter your location manually.');
+        return;
+    }
     
-    fetchFromApi(apiUrl);
+    showLoading(true);
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude: lat, longitude: lon } = position.coords;
+            fetchWeatherDataByCoords(lat, lon);
+            const elements = {
+                locationPrompt: document.querySelector('.location-prompt'),
+                changeLocationButton: document.getElementById('change-location')
+            };
+            toggleLocationUI(elements, false);
+        },
+        (error) => {
+            console.error('Geolocation error:', error);
+            showAlert('Unable to get your location. Please enter it manually.');
+            showLoading(false);
+        }
+    );
+}
+
+// Consolidated fetch functions
+function fetchWeatherDataByCoords(lat, lon) {
+    const url = `${CONFIG.BASE_URL}/${lat},${lon}?unitGroup=us&key=${CONFIG.API_KEY}&contentType=json`;
+    fetchFromApi(url);
 }
 
 function fetchWeatherData(location) {
-    const apiKey = '85DUYUNBCSCAENRTSQNQXVZPY'; // Replace with your actual API key
-    const apiUrl = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${encodeURIComponent(location)}?unitGroup=us&key=${apiKey}&contentType=json`;
-    
-    fetchFromApi(apiUrl);
+    const url = `${CONFIG.BASE_URL}/${encodeURIComponent(location)}?unitGroup=us&key=${CONFIG.API_KEY}&contentType=json`;
+    fetchFromApi(url);
 }
 
-function fetchFromApi(apiUrl) {
-    document.querySelector('.loading').style.display = 'flex';
+async function fetchFromApi(apiUrl) {
+    showLoading(true);
     
-    fetch(apiUrl)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            document.querySelector('.loading').style.display = 'none';
-            displayWeatherData(data);
-        })
-        .catch(error => {
-            console.error('Error fetching weather data:', error);
-            document.querySelector('.loading').style.display = 'none';
-            
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error';
-            errorDiv.textContent = 'Unable to load weather data. Please try again later.';
-            document.querySelector('.app-container').appendChild(errorDiv);
-        });
+    try {
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        showLoading(false);
+        displayWeatherData(data);
+        
+    } catch (error) {
+        console.error('Fetch error:', error);
+        showLoading(false);
+        showError('Unable to load weather data. Please try again later.');
+    }
 }
 
 function displayWeatherData(data) {
-    // Extract current weather data
     const current = data.currentConditions;
     const location = data.resolvedAddress;
     
-    // Set location and date
-    document.querySelector('.location').textContent = location.split(',')[0]; // Just the city name
-    document.querySelector('.date').textContent = formatDate(new Date());
-    
-    // Set temperature and weather description
-    document.querySelector('.temperature').textContent = Math.round(current.temp) + '°';
-    document.querySelector('.weather-description').textContent = current.conditions;
-    
-    // Set weather icon
-    const iconUrl = getWeatherIcon(current.icon);
-    document.querySelector('.weather-icon').src = iconUrl;
-    
-    // Set details
-    document.querySelector('.feels-like').textContent = Math.round(current.feelslike) + '°';
-    document.querySelector('.humidity').textContent = current.humidity + '%';
-    document.querySelector('.wind').textContent = Math.round(current.windspeed) + ' mph';
-    
-    // Set forecast
-    const forecastContainer = document.querySelector('.forecast');
-    forecastContainer.innerHTML = ''; // Clear existing forecast
-    
-    // Loop through next 5 days of forecast
-    const daysToShow = Math.min(5, data.days.length - 1); // Skip today, show next 5 days
-    for (let i = 1; i <= daysToShow; i++) {
-        const day = data.days[i];
-        const forecastDay = document.createElement('div');
-        forecastDay.className = 'forecast-day';
-        
-        forecastDay.innerHTML = `
-            <div class="forecast-date">${formatDayName(new Date(day.datetime))}</div>
-            <img src="${getWeatherIcon(day.icon)}" class="forecast-icon" alt="Forecast">
-            <div class="forecast-temp">${Math.round(day.tempmax)}° / ${Math.round(day.tempmin)}°</div>
-        `;
-        
-        forecastContainer.appendChild(forecastDay);
-    }
-    
-    // Apply theme based on current weather conditions and time
-    applyWeatherTheme(current.icon, current.sunrise, current.sunset, current.datetime);
+    updateCurrentWeather(current, location);
+    updateForecast(data.days);
+    applyWeatherTheme(current);
 }
 
+function updateCurrentWeather(current, location) {
+    const updates = {
+        '.location': location.split(',')[0],
+        '.date': formatDate(new Date()),
+        '.temperature': `${Math.round(current.temp)}°`,
+        '.weather-description': current.conditions,
+        '.feels-like': `${Math.round(current.feelslike)}°`,
+        '.humidity': `${current.humidity}%`,
+        '.wind': `${Math.round(current.windspeed)} mph`
+    };
+    
+    // Update all elements efficiently
+    Object.entries(updates).forEach(([selector, value]) => {
+        const element = document.querySelector(selector);
+        if (element) element.textContent = value;
+    });
+    
+    // Update weather icon
+    const iconElement = document.querySelector('.weather-icon');
+    if (iconElement) {
+        iconElement.src = getWeatherIcon(current.icon);
+        iconElement.alt = current.conditions;
+    }
+}
+
+function updateForecast(days) {
+    const forecastContainer = document.querySelector('.forecast');
+    if (!forecastContainer) return;
+    
+    forecastContainer.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    
+    const daysToShow = Math.min(CONFIG.FORECAST_DAYS, days.length - 1);
+    
+    for (let i = 1; i <= daysToShow; i++) {
+        const day = days[i];
+        const forecastDay = createForecastDay(day);
+        fragment.appendChild(forecastDay);
+    }
+    
+    forecastContainer.appendChild(fragment);
+}
+
+function createForecastDay(day) {
+    const forecastDay = document.createElement('div');
+    forecastDay.className = 'forecast-day';
+    
+    forecastDay.innerHTML = `
+        <div class="forecast-date">${formatDayName(new Date(day.datetime))}</div>
+        <img src="${getWeatherIcon(day.icon)}" class="forecast-icon" alt="${day.conditions}" loading="lazy">
+        <div class="forecast-temp">${Math.round(day.tempmax)}° / ${Math.round(day.tempmin)}°</div>
+    `;
+    
+    return forecastDay;
+}
+
+// Utility functions
 function formatDate(date) {
-    const options = { weekday: 'long', month: 'long', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric' 
+    });
 }
 
 function formatDayName(date) {
@@ -198,80 +275,91 @@ function formatDayName(date) {
 }
 
 function getWeatherIcon(condition) {
-    // Map condition codes to icon paths
-    // For GitHub hosting we'll use placeholder images
-    // In a more complete version, you'd use actual weather icons
-    return `https://via.placeholder.com/120/87CEEB/FFFFFF?text=${condition}`;
+    const iconName = WEATHER_ICONS[condition] || condition;
+    return `https://via.placeholder.com/120/87CEEB/FFFFFF?text=${iconName}`;
 }
 
-function applyWeatherTheme(condition, sunrise, sunset, currentTime) {
-    let themeClass = '';
-    const body = document.body;
-    const appContainer = document.querySelector('.app-container');
+function showLoading(show) {
+    const loadingElement = document.querySelector('.loading');
+    if (loadingElement) {
+        loadingElement.style.display = show ? 'flex' : 'none';
+    }
+}
+
+function showAlert(message) {
+    alert(message); // In production, use a custom modal
+}
+
+function showError(message) {
+    // Remove existing error messages
+    const existingError = document.querySelector('.error');
+    if (existingError) existingError.remove();
     
-    // Remove any existing theme classes
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error';
+    errorDiv.textContent = message;
+    
+    const appContainer = document.querySelector('.app-container');
+    if (appContainer) appContainer.appendChild(errorDiv);
+}
+
+// Weather theme and effects
+function applyWeatherTheme(current) {
+    cleanupEffects();
+    
+    const body = document.body;
     body.className = '';
     
-    // Clear any existing effects
-    const existingEffects = document.querySelectorAll('.rain-drops, .snow-flakes, .lightning');
-    existingEffects.forEach(effect => effect.remove());
-    
-    // Determine if it's day or night for clear conditions
-    const isNight = isNightTime(sunrise, sunset, currentTime);
-    
-    // Set theme based on weather condition
-    switch (condition) {
-        case 'clear-day':
-            themeClass = 'theme-clear-day';
-            break;
-        case 'clear-night':
-            themeClass = 'theme-clear-night';
-            addStars();
-            break;
-        case 'partly-cloudy-day':
-            themeClass = 'theme-clear-day';
-            addClouds(3);
-            break;
-        case 'partly-cloudy-night':
-            themeClass = 'theme-clear-night';
-            addClouds(3);
-            addStars();
-            break;
-        case 'cloudy':
-            themeClass = 'theme-cloudy';
-            addClouds(6);
-            break;
-        case 'rain':
-        case 'showers-day':
-        case 'showers-night':
-            themeClass = 'theme-rain';
-            addRain();
-            break;
-        case 'thunder-rain':
-        case 'thunder-showers-day':
-        case 'thunder-showers-night':
-        case 'thunder':
-            themeClass = 'theme-thunderstorm';
-            addRain();
-            addLightning();
-            break;
-        case 'snow':
-        case 'snow-showers-day':
-        case 'snow-showers-night':
-            themeClass = 'theme-snow';
-            addSnow();
-            break;
-        default:
-            // Default to clear day/night based on time
-            themeClass = isNight ? 'theme-clear-night' : 'theme-clear-day';
-            if (isNight) addStars();
-    }
+    const isNight = isNightTime(current.sunrise, current.sunset, current.datetime);
+    const themeClass = getThemeClass(current.icon, isNight);
     
     body.classList.add(themeClass);
+    applyWeatherEffects(current.icon, isNight);
+}
+
+function getThemeClass(condition, isNight) {
+    const themeMap = {
+        'clear-day': 'theme-clear-day',
+        'clear-night': 'theme-clear-night',
+        'partly-cloudy-day': 'theme-clear-day',
+        'partly-cloudy-night': 'theme-clear-night',
+        'cloudy': 'theme-cloudy',
+        'rain': 'theme-rain',
+        'thunder': 'theme-thunderstorm',
+        'snow': 'theme-snow'
+    };
+    
+    return themeMap[condition] || (isNight ? 'theme-clear-night' : 'theme-clear-day');
+}
+
+function applyWeatherEffects(condition, isNight) {
+    const effects = {
+        'rain': () => addRain(),
+        'thunder': () => { addRain(); addLightning(); },
+        'snow': () => addSnow(),
+        'partly-cloudy-night': () => addStars(),
+        'clear-night': () => addStars()
+    };
+    
+    const effect = effects[condition];
+    if (effect) effect();
+    else if (isNight) addStars();
+}
+
+function cleanupEffects() {
+    // Clear existing effects
+    const effectSelectors = ['.rain-drops', '.snow-flakes', '.lightning'];
+    effectSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => el.remove());
+    });
+    
+    // Clear intervals
+    appState.intervals.forEach(id => clearInterval(id));
+    appState.intervals.clear();
 }
 
 function isNightTime(sunrise, sunset, currentTime) {
-    // Convert times to comparable format
     const now = new Date(currentTime).getTime();
     const sunriseTime = new Date(sunrise).getTime();
     const sunsetTime = new Date(sunset).getTime();
@@ -279,93 +367,128 @@ function isNightTime(sunrise, sunset, currentTime) {
     return now < sunriseTime || now > sunsetTime;
 }
 
+// Weather effect functions
 function addRain() {
     const rainContainer = document.createElement('div');
     rainContainer.className = 'rain-drops';
-    document.querySelector('.app-container').appendChild(rainContainer);
     
-    const containerWidth = rainContainer.offsetWidth;
+    const appContainer = document.querySelector('.app-container');
+    if (!appContainer) return;
     
-    // Create rain drops
-    for (let i = 0; i < 50; i++) {
-        const drop = document.createElement('div');
-        drop.className = 'rain-drop';
+    appContainer.appendChild(rainContainer);
+    
+    // Use setTimeout to ensure container is rendered
+    setTimeout(() => {
+        const containerWidth = rainContainer.offsetWidth || window.innerWidth;
+        const fragment = document.createDocumentFragment();
         
-        // Random positioning
-        const left = Math.random() * containerWidth;
-        const animationDuration = 0.5 + Math.random() * 0.5; // Between 0.5 and 1s
-        const animationDelay = Math.random() * 2; // Between 0 and 2s
+        for (let i = 0; i < CONFIG.RAIN_DROPS; i++) {
+            const drop = createRainDrop(containerWidth);
+            fragment.appendChild(drop);
+        }
         
-        drop.style.left = `${left}px`;
-        drop.style.animation = `rainFall ${animationDuration}s linear infinite ${animationDelay}s`;
-        drop.style.opacity = 0.5 + Math.random() * 0.5;
-        
-        rainContainer.appendChild(drop);
-    }
+        rainContainer.appendChild(fragment);
+    }, 10);
+}
+
+function createRainDrop(containerWidth) {
+    const drop = document.createElement('div');
+    drop.className = 'rain-drop';
+    
+    const left = Math.random() * containerWidth;
+    const duration = 0.5 + Math.random() * 0.5;
+    const delay = Math.random() * 2;
+    const opacity = 0.5 + Math.random() * 0.5;
+    
+    Object.assign(drop.style, {
+        left: `${left}px`,
+        animation: `rainFall ${duration}s linear infinite ${delay}s`,
+        opacity: opacity
+    });
+    
+    return drop;
 }
 
 function addSnow() {
     const snowContainer = document.createElement('div');
     snowContainer.className = 'snow-flakes';
-    document.querySelector('.app-container').appendChild(snowContainer);
     
-    const containerWidth = snowContainer.offsetWidth;
+    const appContainer = document.querySelector('.app-container');
+    if (!appContainer) return;
     
-    // Create snowflakes
-    for (let i = 0; i < 40; i++) {
-        const flake = document.createElement('div');
-        flake.className = 'snow-flake';
+    appContainer.appendChild(snowContainer);
+    
+    setTimeout(() => {
+        const containerWidth = snowContainer.offsetWidth || window.innerWidth;
+        const fragment = document.createDocumentFragment();
         
-        // Random flake size
-        const size = 3 + Math.random() * 5;
-        flake.style.width = `${size}px`;
-        flake.style.height = `${size}px`;
+        for (let i = 0; i < CONFIG.SNOW_FLAKES; i++) {
+            const flake = createSnowFlake(containerWidth);
+            fragment.appendChild(flake);
+        }
         
-        // Random positioning
-        const left = Math.random() * containerWidth;
-        const animationDuration = 3 + Math.random() * 5; // Between 3 and 8s
-        const animationDelay = Math.random() * 5; // Between 0 and 5s
-        
-        flake.style.left = `${left}px`;
-        flake.style.opacity = 0.7 + Math.random() * 0.3;
-        flake.style.animation = `snowFall ${animationDuration}s linear infinite ${animationDelay}s`;
-        
-        snowContainer.appendChild(flake);
-    }
+        snowContainer.appendChild(fragment);
+    }, 10);
+}
+
+function createSnowFlake(containerWidth) {
+    const flake = document.createElement('div');
+    flake.className = 'snow-flake';
+    
+    const size = 3 + Math.random() * 5;
+    const left = Math.random() * containerWidth;
+    const duration = 3 + Math.random() * 5;
+    const delay = Math.random() * 5;
+    const opacity = 0.7 + Math.random() * 0.3;
+    
+    Object.assign(flake.style, {
+        width: `${size}px`,
+        height: `${size}px`,
+        left: `${left}px`,
+        opacity: opacity,
+        animation: `snowFall ${duration}s linear infinite ${delay}s`
+    });
+    
+    return flake;
 }
 
 function addLightning() {
     const lightningContainer = document.createElement('div');
     lightningContainer.className = 'lightning';
-    document.querySelector('.app-container').appendChild(lightningContainer);
+    
+    const appContainer = document.querySelector('.app-container');
+    if (!appContainer) return;
+    
+    appContainer.appendChild(lightningContainer);
     
     const flash = document.createElement('div');
     flash.className = 'lightning-flash';
     lightningContainer.appendChild(flash);
     
-    // Create lightning flashes at random intervals
-    setInterval(() => {
-        if (Math.random() > 0.8) { // 20% chance of lightning
-            flash.style.opacity = 0.8;
-            setTimeout(() => { flash.style.opacity = 0; }, 100);
-            setTimeout(() => { 
-                if (Math.random() > 0.5) { // 50% chance of secondary flash
-                    flash.style.opacity = 0.6;
-                    setTimeout(() => { flash.style.opacity = 0; }, 80);
+    // Lightning animation
+    const lightningInterval = setInterval(() => {
+        if (Math.random() > 0.8) {
+            flash.style.opacity = '0.8';
+            setTimeout(() => { flash.style.opacity = '0'; }, 100);
+            
+            setTimeout(() => {
+                if (Math.random() > 0.5) {
+                    flash.style.opacity = '0.6';
+                    setTimeout(() => { flash.style.opacity = '0'; }, 80);
                 }
             }, 200);
         }
     }, 3000);
-}
-
-function addClouds(count) {
-    // This would be a more advanced feature requiring SVG or complex CSS
-    // For simplicity, it's not fully implemented in this version
-    console.log(`Would add ${count} clouds in a more complete implementation`);
+    
+    appState.intervals.add(lightningInterval);
 }
 
 function addStars() {
-    // Stars are already added in the background, but this function is kept
-    // for compatibility with the existing code
-    console.log("Stars already added in the background");
+    // Stars are already created in the background
+    console.log("Background stars are already active");
 }
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    cleanupEffects();
+});
